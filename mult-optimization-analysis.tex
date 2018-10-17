@@ -1,0 +1,283 @@
+\documentclass[a4paper,10pt,fleqn]{article}
+
+\title{Analysis and Comparison of two Multiplication Algorithms for the Hack Computer}
+\author{Collin J. Doering}
+
+\usepackage{amsmath,amssymb,fullpage,listings,xcolor,colortbl,tabu,pgfplots}
+
+% Adjust margin (right and left)
+%\addtolength{\textwidth}{2cm}
+%\addtolength{\hoffset}{-1cm}
+
+% Adjust margin (top and bottom)
+%\addtolength{\textheight}{2cm}
+%\addtolength{\voffset}{-1cm}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}{Definition}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  This article introduces two simple multiplication algorithms, written for the \emph{Hack}
+  computer in \emph{Hack} assembly. There after, a thorough caparison of the number of
+  instructions required to compute each multiplication algorithm is given.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+\section{Introduction}
+
+The \emph{Hack} computer, as specified by the book for \emph{Nand to
+  Tetris}\footnote{\label{nandtotetrisbook}The Elements of Computing Systems by Noam Nisan and
+  Shimon Schocken} has two registers. The \emph{A} register is used to store addresses and
+data, whereas the \emph{D} register is used to store solely data. The \emph{M} register (which
+isn't technically a register, but acts like one) is used to access/modify \emph{RAM[A]} where
+\emph{A} is the value currently contained within the \emph{A} register. The ALU (Arithmetic
+Logic Unit) within the CPU unfortunately does not come with a circuit for
+multiplication\footnote{Among other things modern computers are expected to have like floating
+  point registers/operations, etc \ldots}, so this needs to be implemented in software. Two
+such ways for doing so are given here, followed by analyses of both algorithms and finally a
+comparison of the number of \emph{Hack} machine instructions required by either algorithm.
+
+As most readers will already know, multiplication of natural numbers is simply repeated
+addition. This premise is used in both multiplication algorithms given in the upcoming section.
+Given formally:
+
+\begin{equation*}
+\forall (a,b) \in \mathbb{N} : a \cdot b = \sum_{i=1}^{b} a = \sum_{i=1}^{a} b
+\end{equation*}
+
+\subsection{Conventions}
+Throughout the following analyses $a$ and $b$ will refer to the decimal values of \emph{RAM[0]}
+and \emph{RAM[1]} respectively.
+
+\section{Naive Implementation}
+\label{naive_section}
+Using the idea defined in the introduction, that is, multiplication of natural numbers is
+repeated addition, we set out to implement a program in \emph{Hack} assembly that models this
+behavior. Immediately we have a choice of whether to do a additions of b or b additions of a.
+We setting on the former but the choice is arbitrary. To be clear we will increment
+\emph{RAM[1]}, \emph{RAM[0]} times storing the result in \emph{RAM[2]}. A possible
+implementation is as follows.
+
+\subsection{Hack Assembly}
+\lstinputlisting[numbers=left,frame=L,breaklines=true,xleftmargin=\parindent]{code/MultNaive.asm}
+
+\subsection{Analysis}
+\label{naive_analysis}
+Beginning the analysis of the program at the first non-comment line, it is clear two
+instructions are run to initialize \emph{RAM[2]} to zero. Then follows a loop condition and
+accompanying loop body. The loop condition is checked/executed $a + 1$ times, $a$ of which
+execute the loop body upon there completion.
+\newline
+
+\begin{gather*}
+  \text{Let } M_{naive} : \mathbb{N} \times \mathbb{N} \to \mathbb{N} \\
+  \begin{split}
+    M_{naive}(a,b) & = \underbrace{2}_{\text{initialize \emph{RAM[2]}}}  + \underbrace{a(\overbrace{4}^{condition} + \overbrace{8}^{body})}_{\text{loop condition and body run $a$ times}}+ \underbrace{6}_{\text{last run of the loop condition}} \\
+    & = 12a + 8
+  \end{split}
+\end{gather*}
+
+\subsubsection{Concluding Comments}
+After analysis of the naive implementation of multiplication in \emph{Hack} assembly, it is
+clear that as $a - b$ grows so does the number of instructions required to compute $a \cdot b$.
+This is problematic because as multiplication is a commutative operation, one would expect that regardless of the order of the inputs it performs a similar, if not identical number of instructions. That is, $M_{naive}(a,b) \approx M_{naive}(b,a)$. This however, is not the case. For example:
+\begin{equation*}
+\forall x \in \mathbb{N} : M_{naive}(x,0) > M_{naive}(0,x) \because 12x + 8 > 8
+\end{equation*}
+
+It becomes clear that in the case when $a > b$ our naive implementation will end up executing
+the loop body and condition instructions an additional $a - b$ times. Optimally we would like
+to check for this case and switch the values of a and b respectively. This corresponds to
+swapping the values contained within \emph{RAM[0]} and \emph{RAM[1]}, and is detailed in the following section.
+
+\section{Swapping Implementation}
+\label{swap_section}
+As mentioned in the end of last section, in the case of $a > b$, the naive implementation will
+perform many unnecessary instructions. To avoid this, we instead check to see if $a > b$ and if
+so, swap their values and compute $a \cdot b$ as we did before using repeated addition. A possible implementation is as follows.
+
+\subsection{Hack Assembly}
+\lstinputlisting[numbers=left,frame=L,breaklines=true,xleftmargin=\parindent]{code/Mult.asm}
+
+\subsection{Analysis}
+\label{swap_analysis}
+Similarly to the naive algorithm, outlined previously, the swapping implementation takes the
+same two instructions to initialize \emph{RAM[2]} to zero. Thereafter it takes another eight and
+ten instructions for the $a > b$ and $a \leq b$ cases respectively. These instructions
+initialize \emph{RAM[3]} to zero and check whether $a > b$, finally making the appropriate
+jump. In the case $a > b$, that is the swap case, an additional 12 instructions are executed to
+perform the swap of \emph{RAM[0]} and \emph{RAM[1]}, using \emph{RAM[3]} as temporary storage.
+Then the repeated addition of $b$, $a$ times occurs just like in the naive implementation,
+which takes the same number of instructions. That is, the loop condition $a + 1$ times, $a$ of
+which execute the loop body.
+\begin{align*}
+    \text{Let } & M_{\leq} : \mathbb{N} \times \mathbb{N} \to \mathbb{N} \\
+    & M_{>} : \mathbb{N} \times \mathbb{N} \to \mathbb{N} \\
+    & M_{swap} : \mathbb{N} \times \mathbb{N} \to \mathbb{N}
+\end{align*}
+Where $M_{\leq}(a,b)$ and $M_{>}(a,b)$ compute the number of instructions executed for the
+$a \leq b$ and $a > b$ cases respectively. $M_{swap}(a,b)$ computes the number of instructions
+executed in either case.
+
+\begin{align*}
+  \begin{split}
+    M_{\leq}(a,b) & = \underbrace{10}_{\text{initialize program}} + \underbrace{a(4 + 8) + 6}_{\text{loop (same \# of instructions as naive algorithm)}} \\
+    & = 12a + 16 \\
+    M_{>}(a,b) & = \underbrace{8}_{\text{initialize program}} + \underbrace{12}_{\text{swap \emph{REG[0]} and \emph{REG[1]}}} + \underbrace{b(4 + 8) + 6}_{\text{loop (same \# of instructions as naive algorithm)}} \\
+    & = 12b + 26
+  \end{split} \\
+  M_{swap}(a,b) & =
+  \begin{cases}
+    M_{>}(a,b) & \text{if } a > b \quad \text{(swap case)} \\
+    M_{\leq}(a,b) & \text{if } a \leq b \quad \text{(otherwise)}
+  \end{cases}
+\end{align*}
+
+\section{Comparison of Algorithms}
+Following the analyses given in sections \ref{naive_analysis} and \ref{swap_analysis}, we need
+to find the difference in the number of instructions executed by each algorithm. Here we can
+choose to define the difference by either the number of instructions executed by the swap
+implementation minus the number executed by the naive implementation, or vice versa. That is,
+$D(a,b) = M_{swap}(a,b) - M_{naive}(a,b)$ or $D(a,b) = M_{naive}(a,b) - M_{swap}(a,b)$ respectively. The
+choice is arbitrary and simply changes the meaning of the functions output; specifically it
+changes whether it's positive or negative. Below we have chosen the prior, so a negative output
+means the swap implementation took fewer steps and a positive output implies it took greater.
+
+\begin{align*}
+  \text{Let } D & : \mathbb{N} \times \mathbb{N} \to \mathbb{N} \\
+  D(a,b) & =
+  \begin{cases}
+    M_{>}(a,b) - M_{naive}(a,b) & \text{if } a > b \\
+    M_{\leq}(a,b) - M_{naive}(a,b) & \text{if } a \leq b
+  \end{cases} \\
+  & =
+  \begin{cases}
+    (12b + 26) - (12a + 8) \\
+    (12a + 16) - (12a + 8)
+  \end{cases} \\
+  & =
+  \begin{cases}
+    12(b - a) + 18 \\
+    8
+  \end{cases}
+\end{align*}
+
+Notice that in the case $a \leq b$ the swap implementation actually takes 8 more instructions.
+However, in the case $a > b$, $b - a$ will always be negative, and when $b - a < -1$ then
+$D(a,b) < 0$ which indicates that the swap implementation will take fewer instructions for a
+majority of the $a > b$ case. The only instance where this is not the case is when
+$b - a = -1$, where the swap implementation will instead cost an extra 6 instructions.
+
+\subsection{Average Difference}
+
+Now that we have a function $D(a,b)$ that determines the difference of the number of
+instructions required to compute $a \cdot b$ we can proceed to determining the average
+difference. That is, how many instructions, on average are saved or gained by using the swap
+implementation versus the naive implementation. This average will be dependent on the largest
+natural number the algorithms will be used for. On the \emph{Hack} computer, this is
+$2^{16} - 1 = 65535$, though we will calculate for the general case where $n \in \mathbb{N}$.
+\begin{figure}[h!]
+  \label{fig:tables}
+  \centering
+  \begin{tabu}{ c | [2pt]c | c | c | c | c}
+    $(a,b)$  & $0$                              & $1$                               & $2$                               & $3$                              & \ldots \\ \tabucline[2pt]{-}
+    $0$      & \cellcolor{green!25}$(0,0)_{\leq}$ & \cellcolor{green!25}$(0,1)_{\leq}$ & \cellcolor{green!25}$(0,2)_{\leq}$ & \cellcolor{green!25}$(0,3)_{\leq}$ & \cellcolor{green!25}\ldots \\ \hline
+    $1$      & \cellcolor{blue!25}$(1,0)_{>}$  & \cellcolor{green!25}$(1,1)_{\leq}$ & \cellcolor{green!25}$(1,2)_{\leq}$ & \cellcolor{green!25}$(1,3)_{\leq}$ & \cellcolor{green!25}\ldots \\ \hline
+    $2$      & \cellcolor{blue!25}$(2,0)_{>}$  & \cellcolor{blue!25}$(2,1)_{>}$ & \cellcolor{green!25}$(2,2)_{\leq}$ & \cellcolor{green!25}$(2,3)_{\leq}$ & \cellcolor{green!25}\ldots \\ \hline
+    $3$      & \cellcolor{blue!25}$(3,0)_{>}$  & \cellcolor{blue!25}$(3,1)_{>}$ & \cellcolor{blue!25}$(3,2)_{>}$  & \cellcolor{green!25}$(3,3)_{\leq}$ & \cellcolor{green!25}\ldots \\ \hline
+    $\vdots$ & \cellcolor{blue!25}$\vdots$    & \cellcolor{blue!25}$\vdots$ & \cellcolor{blue!25}$\vdots$       & \cellcolor{blue!25}$\ddots$      & \cellcolor{green!25}$\ddots$ \\
+  \end{tabu}
+  \,
+  \begin{tabu}{ c | [2pt]c | c | c | c | c}
+    $b - a$ & $0$                       & $1$                        & $2$                      & $3$                      & \ldots                     \\ \tabucline[2pt]{-}
+    $0$     & \cellcolor{green!25}$0$   & \cellcolor{green!25}$1$   & \cellcolor{green!25}$2$ & \cellcolor{green!25}$3$ & \cellcolor{green!25}\ldots \\ \hline
+    $1$     & \cellcolor{blue!25}$-1$    & \cellcolor{green!25}$0$    & \cellcolor{green!25}$1$ & \cellcolor{green!25}$2$ & \cellcolor{green!25}\ldots \\ \hline
+    $2$     & \cellcolor{blue!25}$-2$    & \cellcolor{blue!25}$-1$     & \cellcolor{green!25}$0$  & \cellcolor{green!25}$1$ & \cellcolor{green!25}\ldots \\ \hline
+    $3$     & \cellcolor{blue!25}$-3$    & \cellcolor{blue!25}$-2$     & \cellcolor{blue!25}$-1$   & \cellcolor{green!25}$0$  & \cellcolor{green!25}\ldots \\ \hline
+    $\vdots$  & \cellcolor{blue!25}$\vdots$ & \cellcolor{blue!25}$\vdots$ & \cellcolor{blue!25}$\vdots$ & \cellcolor{blue!25}$\ddots$ & \cellcolor{green!25}$\ddots$ \\
+  \end{tabu}
+  \caption{Tables showing combinations of $(a,b)$, and $b - a$ along with color coding where blue indicates $a > b$ and green indicates $a \leq b$}
+\end{figure}
+
+Let $S = \{(x,y) : x,y \in \mathbb{N}[0,n]\}$ where $S$ represents all possible inputs to
+either multiplication algorithm; that is, all possible pairs of natural numbers smaller than or
+equal to $n$.
+\begin{equation}
+  \label{eq:avg}
+  Avg(n) = \frac{\sum_{(a,b) \in S} D(a,b)}{(n + 1)^2}
+\end{equation}
+To find the average difference we need to compute Equation \ref{eq:avg}. From the tables shown
+in Figure \ref{fig:tables}, we can see the numerator of Equation \ref{eq:avg} can be broken into two different sums,
+one for each case $a \leq b$ and $a > b$ as follows.
+\begin{align*}
+  a \leq b & \implies D(a,b) = 8 \\
+  & \implies \sum_{(a,b) \in S : a \leq b} D(a,b) = 8 \cdot \sum_{i=1}^{n+1} i && \because \quad \left\vert{\{(a,b) \in S : a \leq b\}}\right\vert = \sum_{i=1}^{n+1} i \\
+  a > b & \implies D(a,b) = 12(b - a) + 18 \\
+  & \implies \sum_{(a,b) \in S : a > b} D(a,b) = \sum_{i=1}^{n} i(12(i - n - 1) + 18) && \because \sum_{(a,b) \in S : a > b} b - a = \sum_{i=1}^{n} i(i - n - 1)
+\end{align*}
+
+Finally, this leads to the following definition of the average difference function:
+\begin{align*}
+\text{Let } Avg & : \mathbb{N} \to \mathbb{Q} \\
+Avg(n) & = \frac{\sum_{(a,b) \in S} D(a,b)}{(n + 1)^2} \\
+& = \frac{8 \cdot \sum_{i=1}^{n+1} i + \sum_{i=1}^{n} i(12(i-n-1) + 18)}{(n + 1)^{2}} \\
+& = \frac{8 \cdot \frac{1}{2}(n + 1)(n + 2) + \sum_{i=1}^{n} i(12i - 12n + 6)}{(n + 1)^{2}} \\
+& = \frac{4(n + 1)(n + 2) + \sum_{i=1}^{n} (12i^{2} - 12ni + 6i)}{(n + 1)^{2}} \\
+& = \frac{4(n + 1)(n + 2) + 12 (\sum_{i=1}^{n} i^{2}) - 12(\sum_{i=1}^{n} i) + 6(\sum_{i=1}^{n} i)}{(n + 1)^{2}} \\
+& = \frac{4(n + 1)(n + 2) + \frac{1}{6} \cdot 12n(n + 1)(2n + 1) - \frac{1}{2} \cdot 12n^{2}(n + 1) + \frac{1}{2} \cdot 6n(n + 1)}{(n + 1)^{2}} \\
+& = \frac{(n + 1)(4(n + 2) + 2n(2n + 1) - 6n^{2} + 3n)}{(n + 1)^{2}} \\
+& = \frac{4n + 8 + 4n^{2} + 2n - 6n^{2} + 3n}{n+1} \\
+& = \frac{8 + 9n - 2n^{2}}{n+1}
+\end{align*}
+
+\section{Conclusion}
+Now that we have defined a average difference function, we can finally make a determination of
+the difference in the number of instructions executed by either algorithm. In Figure
+\ref{fig:avg_graph}, a graph of the $Avg(n)$ function is given, where its visually clear that
+$Avg(n)$ is decreasing. Formally,
+\begin{equation*}
+\lim_{x \to \infty} Avg(n) = -\infty \implies Avg(n) \text{ is monotonically decreasing on interval } [0,\infty]
+\end{equation*}
+This means that as $n$ becomes larger, the more instructions the swap implementation will save.
+In the instance of our \emph{Hack} computer, where the largest unsigned number that can be
+represented is $2^{16}-1 = 65535$, this means on average, the swap implementation will save
+$131059$ instructions because $Avg(65535) = -131059$.
+
+\begin{figure}
+  \label{fig:avg_graph}
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      axis x line=center,
+      axis y line=left,
+      xmin=0,xmax=32,
+      ymin=-50,ymax=12,
+      xlabel=$n$,
+      ylabel={$Avg(n)$}]
+      \addplot [domain=0:32, samples=64, color=blue] {(8 + 9*x - 2*x^2)/(x+1)};
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Graph of the average difference function}
+\end{figure}
+
+In closing, utilizing the swap implementation of the multiplication algorithm given in Section
+\ref{swap_section} is significantly better that the naive implementation given in Section
+\ref{naive_section}. The idea of choosing the smallest of $a$ and $b$ when multiplying numbers
+by repeated addition applies generally to any program though this is not rigorously proven in
+this article.
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

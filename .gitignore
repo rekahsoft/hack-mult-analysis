@@ -1,0 +1,9 @@
+# Latex files
+*.aux
+*.log
+*.pdf
+*.toc
+
+# Editor specific files
+auto/
+*~
